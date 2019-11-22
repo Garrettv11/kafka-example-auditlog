@@ -1,0 +1,27 @@
+.DS_Store
+*.sw*
+*~
+build/
+dist/
+node_modules/
+vendor/
+webroot/
+tmp/
+temp/
+log/
+logs/
+/workspace/
+/cache/
+coverage/
+.idea
+.vscode
+*.iml
+api.log
+npm-debug.log
+
+#omit new relic log files
+newrelic.log
+newrelic_agent.log
+
+#file containing sensitive config settings
+.env

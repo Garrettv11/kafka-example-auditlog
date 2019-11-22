@@ -1,0 +1,32 @@
+#!/bin/bash
+
+files=$(git diff --diff-filter=ACMRT --cached --name-only | grep '\.jsx\|\.js\?$')
+
+# Prevent ESLint help message if no files matched
+if [[ $files = "" ]] ; then
+ exit 0
+fi
+
+failed=0
+for file in ${files}; do
+
+    git show :$file | eslint --config .eslintrc.js $file
+    if [[ $? != 0 ]] ; then
+        failed=1
+    fi
+
+
+done;
+
+# commented out until a fix is found for the 30 second hang
+if [[ $failed == 0 ]] ; then
+    git show :$file | npm test unit
+    if [[ $? != 0 ]] ; then
+        failed=1
+    fi
+fi
+
+if [[ $failed != 0 ]] ; then
+  echo "ESLint check failed, commit denied"
+  exit $failed
+fi

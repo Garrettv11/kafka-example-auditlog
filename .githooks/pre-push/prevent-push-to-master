@@ -1,0 +1,18 @@
+#!/bin/bash
+
+protected_branch='(master)' # you can set up multiple protected branches
+
+policy='[Policy] You didnt really meant to push to the '$protected_branch' branch, did ya? (Prevented with pre-push hook.)'
+
+parent_pid=$(ps -oppid= -p $PPID)
+push_command=$(ps -ocommand= -p $parent_pid)
+
+is_destructive='force|delete|\-f'
+will_remove_protected_branch=':'$protected_branch
+
+if ([[ $push_command =~ $is_destructive ]] && [[ $push_command =~ $protected_branch ]]) \
+    || [[ $push_command =~ $will_remove_protected_branch ]] || [[ $push_command =~ $protected_branch ]]
+then
+  echo $policy
+  exit 1
+fi
