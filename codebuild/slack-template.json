@@ -1,0 +1,12 @@
+{
+  "channel": "",
+  "attachments": [{
+    "fallback": "",
+    "color": "",
+    "fields": [{
+      "title": "",
+      "value": "",
+      "short": false
+    }]
+  }]
+}

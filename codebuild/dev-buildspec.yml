@@ -1,0 +1,71 @@
+version: 0.2
+
+# Usage:
+# aws codebuild start-build \
+#   --project-name codebuild_dev_nora-hapi-starter-kit \
+#   --source-version $SOURCE_VERSION \
+#   --buildspec-override codebuild/dev-buildspec.yml \
+#   --environment-variables-override name=ENV,value=$ENV
+
+env:
+  variables:
+    ENV: "dev"  # override this value for stage, sandbox, build, etc
+    IMAGE_TAG: "latest"
+    IMAGE_REPO_NAME: "ecr_dev_hapi-starter-kit"
+    AWS_ACCOUNT_ID: "125900505984"
+    SLACK_CHANNEL: "tech-backend"
+    SLACK_WEBHOOK: "https://hooks.slack.com/services/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"
+    CODEBUILD_URL: "<https://us-west-2.console.aws.amazon.com/codebuild/home?region=us-west-2#/builds/%s/view/new|View Log>"
+    PROJECT: "hapi-starter-kit"
+    FAILURE_TITLE: "DOCKER BUILD FAILED"
+    SUCCESS_TITLE: "DOCKER BUILD SUCCEEDED"
+
+phases:
+  install:
+    commands:
+      - export PATH=$PATH:$(pwd)/codebuild
+      - install.sh
+  build:
+    commands:
+      # Docker tags can't have slashes in them, so replace them with underscores
+      - CODEBUILD_SOURCE_VERSION=$(echo "${CODEBUILD_SOURCE_VERSION}" | tr / _)
+      - SHORT_SHA="commit-$(git rev-parse --short HEAD)-${ENV}"
+      - NODE_ENV="${ENV}-ecs"
+      - IMAGE_TAG="${CODEBUILD_SOURCE_VERSION}-${ENV}"
+      - ENV_ALL_CAPS=$(echo "${ENV}" | tr '[a-z]' '[A-Z]')
+
+      # Pull down the environment config file and save the contents into the codebase
+      - aws ssm get-parameters --names "/${ENV_ALL_CAPS}/unity/${PROJECT}/config/.env" --query "Parameters[*].{Value:Value}" --with-decryption --output text > ./.env
+
+      # Build and tag the container
+      - |
+        docker build --build-arg SSH_PRIVATE_KEY="$ROBOT_SSH_KEY" \
+                     --build-arg NODE_ENV="$NODE_ENV" \
+                     --build-arg SHA="$SHORT_SHA" \
+                     -t $IMAGE_REPO_NAME:$IMAGE_TAG \
+                     -t $IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION \
+                     -t $IMAGE_REPO_NAME:$SHORT_SHA \
+                     -f codebuild/build.Dockerfile \
+                     .
+
+      # Create the tags to identify the image on ECR
+      - |
+        docker tag $IMAGE_REPO_NAME:$IMAGE_TAG \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - |
+        docker tag $IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION
+      - |
+        docker tag $IMAGE_REPO_NAME:$SHORT_SHA \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHORT_SHA
+
+      # Get temporary ECR credentials
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+
+      # Push the container image and tags
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHORT_SHA
+  post_build:
+    commands:
+      - send-slack-message.sh

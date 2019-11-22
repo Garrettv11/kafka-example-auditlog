@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  variables:
+    ENV: "dev"
+    SLACK_CHANNEL: "tech-github"
+    SLACK_WEBHOOK: "https://hooks.slack.com/services/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"
+    CODEBUILD_URL: "<https://us-west-2.console.aws.amazon.com/codebuild/home?region=us-west-2#/builds/%s/view/new|View Log>"
+    PROJECT: "hapi-starter-kit"
+    FAILURE_TITLE: "IMAGE SCAN FAILED - DEV"
+    SUCCESS_TITLE: "IMAGE SCAN PASSED - DEV"
+    BD_URL: "https://science37.blackducksoftware.com"
+    BD_TOKEN: "ZGUwZTViZGItY2JmOC00NWRjLWEwNGEtNDQ4ZGEyODY4ZDg4OmRmODIxM2UzLWQxY2YtNGMyOS05NDNhLTI5YzI4YzAxZTU1ZA=="
+
+phases:
+  install:
+    commands:
+      - export PATH=$PATH:$(pwd)/codebuild
+      - install.sh
+      - ssh-setup.sh
+      - curl -LOk https://blackducksoftware.github.io/hub-detect/hub-detect.sh
+      - export VERSION=$(jq '.version' package.json)
+  build:
+    commands:
+      - docker build --build-arg SSH_PRIVATE_KEY="$ROBOT_SSH_KEY" -f codebuild/test.Dockerfile -t test .
+  post_build:
+    commands:
+      - bash hub-detect.sh --blackduck.url=$BD_URL  --blackduck.api.token=$BD_TOKEN --blackduck.trust.cert=true --detect.project.name="$PROJECT" --detect.project.version.name=v$VERSION-$ENV DETECT_CURL_OPTS="-k" --detect.npm.include.dev.dependencies=false --detect.risk.report.pdf=false
+      - aws s3 cp /tmp/*.jar s3://s37-dev-unity-scans/blackduck/$PROJECT/$ENV/
+      - send-slack-message.sh

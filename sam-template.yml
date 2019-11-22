@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: hapi-starter-kit example Lambda
+
+Parameters:
+  SHA:
+    Type: String
+    Default: NOT_FOUND
+    Description: Github build SHA
+  ENV:
+    Type: String
+    Description: Deployment Environment
+  DEBUG:
+    Type: String
+    Default: sync:*
+    Description: Debug statements
+
+Resources:
+  StarterKitApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: starter
+
+  StarterKitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: build
+      Handler: lambda.index.handler
+      Runtime: nodejs8.10
+      Timeout: 180
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+      Environment:
+        Variables:
+          DEBUG: !Ref DEBUG
+          NODE_ENV: !Ref ENV
+          SHA: !Ref SHA
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-def9a0a1
+        SubnetIds:
+          - subnet-fc060cb4
+          - subnet-d4917aad
+          - subnet-cf0cd295
+      Events:
+        getVersion:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StarterKitApi
+            Path: /{proxy+}
+            Method: any
+
+Outputs:
+  AwsApiId:
+    Value: !Ref StarterKitApi

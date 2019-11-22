@@ -1,0 +1,26 @@
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: "test"
+    SLACK_CHANNEL: "tech-backend"
+    SLACK_WEBHOOK: "https://hooks.slack.com/services/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"
+    CODEBUILD_URL: "<https://us-west-2.console.aws.amazon.com/codebuild/home?region=us-west-2#/builds/%s/view/new|View Log>"
+    PROJECT: "hapi-starter-kit"
+    FAILURE_TITLE: "TESTING FAILED"
+    SUCCESS_TITLE: "TESTING PASSED"
+
+phases:
+  install:
+    commands:
+      - export PATH=$PATH:$(pwd)/codebuild
+      - install.sh
+      - ssh-setup.sh
+  build:
+    commands:
+      - docker build --build-arg SSH_PRIVATE_KEY="$ROBOT_SSH_KEY" -f codebuild/test.Dockerfile -t test .
+      - docker run -e "NODE_ENV=$NODE_ENV" test npm run lint
+      - docker run -e "NODE_ENV=$NODE_ENV" test npm test unit
+  post_build:
+    commands:
+      - send-slack-message.sh

@@ -1,0 +1,53 @@
+{
+  "name": "auditlog",
+  "version": "0.0.2",
+  "description": "auditlog",
+  "main": "server.js",
+  "scripts": {
+    "start": "node .",
+    "start-dev": "nodemon .",
+    "test": "jest",
+    "lint": "eslint .",
+    "generate-docs": "NODE_ENV=dev node docs/generate.js && swagger-markdown -i docs/REST.yaml && rm docs/REST.yaml"
+  },
+  "dependencies": {
+    "@hapi/boom": "^7.4.2",
+    "@hapi/hapi": "^18.4.0",
+    "@hapi/inert": "^5.2.0",
+    "@hapi/joi": "^15.0.3",
+    "@hapi/vision": "^5.5.2",
+    "@hapi/wreck": "^15.0.2",
+    "deepmerge": "^3.3.0",
+    "dotenv": "^8.1.0",
+    "hapi-swagger": "^10.0.2",
+    "kafka-node": "^5.0.0",
+    "bluebird": "^3.7.1",
+    "elasticsearch": "^16.5.0"
+  },
+  "devDependencies": {
+    "eslint": "^5.14.1",
+    "nodemon": "^1.18.9",
+    "jest": "^24.8.0",
+    "faker": "^4.1.0",
+    "sinon": "^7.3.2",
+    "sinon-test": "^2.4.0",
+    "git-hooks": "^1.1.10",
+    "json2yaml": "^1.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverage": true,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/config/"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/config/",
+      "/src/routes/",
+      "/src/models/",
+      "/src/lib/",
+      "<rootDir>/server.js"
+    ]
+  }
+}

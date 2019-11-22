@@ -1,0 +1,55 @@
+version: 0.2
+
+# Example Usage change --source-version flag depending on your branch: aws codebuild start-build --project-name codebuild_dev_nora-<servicename>-api --source-version feature/docgen-SAAS-12 --buildspec-override codebuild/apidocs-buildspec.yml --environment-variables-override name=IMAGE_TAG,value=testing name=TEMP_AWS_ACCESS_KEY_ID,value=$(aws configure get default.aws_access_key_id) name=TEMP_AWS_SECRET_ACCESS_KEY,value=$(aws configure get default.aws_secret_access_key)
+
+env:
+  variables:
+    ENV: "dev"
+    NODE_ENV: "dev-ecs"
+    IMAGE_TAG: "latest"
+    IMAGE_REPO_NAME: "ecr_dev_nora-<servicename>-api"
+    AWS_ACCOUNT_ID: "125900505984"
+    SLACK_CHANNEL: "tech-backend"
+    SLACK_WEBHOOK: "https://hooks.slack.com/services/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"
+    CODEBUILD_URL: "<https://us-west-2.console.aws.amazon.com/codebuild/home?region=us-west-2#/builds/%s/view/new|View Log>"
+    PROJECT: "nora-<servicename>-api"
+    FAILURE_TITLE: "DOCKER DOCUMENT BUILD FAILED"
+    SUCCESS_TITLE: "DOCKER DOCUMENT BUILD SUCCEEDED"
+    TEMP_AWS_ACCESS_KEY_ID: ""
+    TEMP_AWS_SECRET_ACCESS_KEY: ""
+
+phases:
+  install:
+    commands:
+      - export PATH=$PATH:$(pwd)/codebuild
+      - install.sh
+  build:
+    commands:
+      # Docker tags can't have slashes in them, so replace them with underscores
+      - CODEBUILD_SOURCE_VERSION=$(echo "${CODEBUILD_SOURCE_VERSION}" | tr / _)
+      - SHA="$(git rev-parse HEAD)"
+      - SHORT_SHA="commit-$(git rev-parse --short HEAD)-${ENV}"
+      - |
+        docker build --build-arg SSH_PRIVATE_KEY="$ROBOT_SSH_KEY" \
+                     --build-arg NODE_ENV="$NODE_ENV" \
+                     --build-arg SHA="$SHA" \
+                     -t $IMAGE_REPO_NAME:$IMAGE_TAG \
+                     -t $IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION \
+                     -t $IMAGE_REPO_NAME:$SHORT_SHA \
+                     -f codebuild/build.Dockerfile \
+                     .
+      - |
+        docker tag $IMAGE_REPO_NAME:$IMAGE_TAG \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - |
+        docker tag $IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$CODEBUILD_SOURCE_VERSION
+      - |
+        docker tag $IMAGE_REPO_NAME:$SHORT_SHA \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$SHORT_SHA
+  post_build:
+    commands:
+      - export GQL_JWT=$(aws ssm get-parameters --names "/DEV/saas/jwt" --query "Parameters[*].{Value:Value}" --with-decryption --output text)
+      - docker run --network host -d -e "NODE_ENV=$NODE_ENV" -e AWS_ACCESS_KEY_ID="$TEMP_AWS_ACCESS_KEY_ID" -e AWS_SECRET_ACCESS_KEY="$TEMP_AWS_SECRET_ACCESS_KEY" --name notification $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - sleep 10
+      - ./codebuild/docgen/generate-specs.sh
