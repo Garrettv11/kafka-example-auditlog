@@ -4,6 +4,7 @@ const Promise = require('bluebird');
 const TOPIC_AUDITLOG_CREATE = 'AuditLogCreate';
 // const config = require(__dirname + '/../../config.js');
 
+
 /**
  * @classdesc Form Producer that pushes updates to Kafka.
  * @class
@@ -31,6 +32,19 @@ class AuditLogCreateConsumer {
       console.log('the message being processed is :', JSON.stringify(auditMessage));
 
       try {
+        let changeId;
+        if (auditMessage.oldRecord) {
+          // there is an old version we are moving from
+          changeId = `${auditMessage.recordType}-
+            ${auditMessage.recordId}-
+            ${auditMessage.oldRecordVersionId}-
+            ${auditMessage.newVersionId}`;
+        }
+        else {
+          // there is no old version
+          changeId = `${auditMessage.recordType}-${auditMessage.recordId}-${auditMessage.newVersionId}`;
+        }
+        console.log('the change id is :', changeId);
         // we need to diff these records
         // use the docs/exampleAuditEntry.json
         // await this.consumer.commitAsync();
