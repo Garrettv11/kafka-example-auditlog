@@ -34,15 +34,16 @@ class AuditLogCreateConsumer {
       try {
         let changeId;
         if (auditMessage.oldRecord) {
+          console.log('there is an old version');
           // there is an old version we are moving from
           changeId = `${auditMessage.recordType}-
             ${auditMessage.recordId}-
             ${auditMessage.oldRecordVersionId}-
-            ${auditMessage.newVersionId}`;
+            ${auditMessage.newRecordVersionId}`;
         }
         else {
           // there is no old version
-          changeId = `${auditMessage.recordType}-${auditMessage.recordId}-${auditMessage.newVersionId}`;
+          changeId = `${auditMessage.recordType}-${auditMessage.recordId}-${auditMessage.newRecordVersionId}`;
         }
         console.log('the change id is :', changeId);
         // we need to diff these records
