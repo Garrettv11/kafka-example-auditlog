@@ -22,7 +22,8 @@
     "hapi-swagger": "^10.0.2",
     "kafka-node": "^5.0.0",
     "bluebird": "^3.7.1",
-    "elasticsearch": "^16.5.0"
+    "elasticsearch": "^16.5.0",
+    "deep-diff": "^1.0.2"
   },
   "devDependencies": {
     "eslint": "^5.14.1",
