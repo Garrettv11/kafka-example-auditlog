@@ -18,7 +18,7 @@ config['dev-docker'] = {
     host: '0.0.0.0',
     port: 6046,
   },
-  kafkaServer: 'kafka:9092',
+  kafkaServer: 'kafka1:9092',
   elasticSearch: {
     host: 'es01:9200',
   },

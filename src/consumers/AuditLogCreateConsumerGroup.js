@@ -2,6 +2,8 @@ const kafka = require('kafka-node');
 const Promise = require('bluebird');
 // const ElasticSearchDao = require(__dirname + '/../dao/ElasticSearch.js');
 const TOPIC_AUDITLOG_CREATE = 'AuditLogCreate';
+const GROUPNAME_AUDITLOG_CREATE = 'AuditLogCreate';
+
 // const config = require(__dirname + '/../../config.js');
 const diff = require('deep-diff');
 const AuditLogRecord = require(__dirname + '/../models/AuditLogRecord.js');
@@ -61,24 +63,35 @@ const createDiffForRecords = (oldRecord, newRecord) => {
  * @classdesc Form Producer that pushes updates to Kafka.
  * @class
  */
-class AuditLogCreateConsumer {
+class AuditLogCreateConsumerGroup {
   /**
   * Create FormCreateConsumer.
   * @constructor
   * @param {String} kafkaHost - address of kafka server
   */
   constructor(kafkaHost) {
-    const client = new kafka.KafkaClient({kafkaHost});
-    const Consumer = kafka.Consumer;
-    this.consumer = Promise.promisifyAll(new Consumer(
-      client,
-      [ { topic: TOPIC_AUDITLOG_CREATE } ],
-      {
-        autoCommit: false,
-      },
-    ));
+    const ConsumerGroup = kafka.ConsumerGroup;
+    const options = {
+      // connect directly to kafka broker (instantiates a KafkaClient)
+      kafkaHost,
+      groupId: GROUPNAME_AUDITLOG_CREATE,
+      autoCommit: false,
+      sessionTimeout: 15000,
+      fetchMaxBytes: 10 * 1024 * 1024, // 10 MB
+      // An array of partition assignment protocols ordered by preference. 'roundrobin' or 'range' string for
+      // built ins (see below to pass in custom assignment protocol)
+      protocol: ['roundrobin'],
+      // Offsets to use for new groups other options could be 'earliest' or 'none'
+      // (none will emit an error if no offsets were saved) equivalent to Java client's auto.offset.reset
+      fromOffset: 'latest',
+      // how to recover from OutOfRangeOffset error (where save offset is past server retention)
+      // accepts same value as fromOffset
+      outOfRangeOffset: 'earliest',
+    };
 
-    this.consumer.on('message', async message => {
+    this.consumerGroup = Promise.promisifyAll(new ConsumerGroup(options, TOPIC_AUDITLOG_CREATE));
+
+    this.consumerGroup.on('message', async message => {
       // try to store the form in S3
       const auditMessage = JSON.parse(message.value);
       console.log('the message being processed is :', JSON.stringify(auditMessage));
@@ -100,7 +113,7 @@ class AuditLogCreateConsumer {
         const hasAlreadyAddedLogToSearch = await ElasticSearchDao.doesDocumentExist('auditlog', changeId);
         console.log('has already added to elastic search? ', hasAlreadyAddedLogToSearch);
         if (hasAlreadyAddedLogToSearch) {
-          return await this.consumer.commitAsync();
+          return await this.consumerGroup.commitAsync();
         }
         console.log('the change id is :', changeId);
 
@@ -135,7 +148,7 @@ class AuditLogCreateConsumer {
         }
         // pass - send to ES
         await ElasticSearchDao.addDocumentWithIdToIndex('auditlog', changeId, auditOutput);
-        return await this.consumer.commitAsync();
+        return await this.consumerGroup.commitAsync();
       }
       catch (error) {
         console.log('error processing audit log:', error);
@@ -143,11 +156,11 @@ class AuditLogCreateConsumer {
       }
     });
 
-    this.consumer.on('error', err => {
+    this.consumerGroup.on('error', err => {
       console.log('Form Create Producer error is :', err);
       throw err;
     });
   }
 }
 
-module.exports = AuditLogCreateConsumer;
+module.exports = AuditLogCreateConsumerGroup;

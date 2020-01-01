@@ -2,7 +2,7 @@ const Hapi = require('@hapi/hapi');
 const healthcheckRoute = require(__dirname + '/src/routes/version.js');
 const plugins = require(__dirname + '/src/plugins/plugins.js');
 const config = require(__dirname + '/config.js');
-const AuditLogConsumer = require(__dirname + '/src/consumers/AuditLogConsumer.js');
+const AuditLogCreateConsumerGroup = require(__dirname + '/src/consumers/AuditLogCreateConsumerGroup.js');
 
 /**
 * @description registers server plugins and starts a hapi server
@@ -15,7 +15,7 @@ const start = async () => {
     await server.register(plugins);
     // add routes
     server.route(healthcheckRoute);
-    server.app.auditLogConsumer = new AuditLogConsumer(config.kafkaServer);
+    server.app.AuditLogCreateConsumerGroup = new AuditLogCreateConsumerGroup(config.kafkaServer);
     await server.start();
     console.log('Server running at:', server.info.uri);
     console.log('Swagger definition available at:', server.info.uri + '/swagger.json');
